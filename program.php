@@ -1,5 +1,7 @@
 <?php
 
+    error_reporting(E_ERROR | E_PARSE);    //Suppresses php warnings (comment out line for development)
+
     $fileHeaders;
     $fileData;
 
@@ -30,9 +32,10 @@
             global $commands;
             if (count ($args) == 0) {
                 echo "\e[34m List of commands:\n\e[37m";
+                echo "  display - displays the currently loaded file (see \"help display\" for details)\n";
                 echo "  exit - exits the program\n";
                 echo "  help - lists all commands \n";
-                echo "  open - opens a csv file\n";
+                echo "  open - loads a csv file\n";
                 echo "\e[39m\n"; //back to default color
             } else {
                 $commands[$args[0]]->help();
@@ -56,7 +59,7 @@
             if (($handle = fopen($args[0], "r")) !== FALSE) {
                 if (($fileHeaders = fgetcsv($handle, 1000, ";")) !== FALSE) {
                     $i = 0;
-                    while (($fileData[$i] = fgetcsv($handle, 1000, ";")) !== FALSE) {}
+                    while (($fileData[$i++] = fgetcsv($handle, 1000, ";")) !== FALSE) {}
                     echo "File loaded successfully\n";
                 } else {
                     echo "\e[31m error reading file\n\e[39m";
@@ -75,7 +78,44 @@
         }
     };
 
-    $commands = array("exit" => $exit, "help" => $help, "open" => $open);
+    $display = new class implements Command {
+        public function execute($args) {
+            global $fileData, $fileHeaders;
+            if (is_null($fileHeaders) || is_null($fileData)) {
+                echo "\e[31m error: no file loaded into program. Use \"open\" to load a file.\n\e[39m";
+            } elseif (count($args) == 0) {
+                //Display the currently loaded csv file
+                $this->standardDisplay();
+            } 
+        }
+
+        public function help() {
+            echo "\e[32m display - displays all information in the currently loaded file";
+            echo"\n\e[39m";
+        } 
+
+        public function argsAreValid($args) {
+            return count($args) == 0;
+        }
+
+        function standardDisplay() {
+            global $fileData, $fileHeaders;
+            foreach ($fileData as &$dataline) {
+                if (is_array($dataline)) {
+                    $i = 0;
+                    foreach ($fileHeaders as &$header) {
+                        echo "\e[96m"; //Change color to light cyan
+                        printf("%s: \e[37m%s", $header, $dataline[$i++]);
+                        echo "\n";
+                    }
+                    echo "\n";
+                }
+            }
+            echo "\e[39m";
+        }
+    };
+
+    $commands = array("exit" => $exit, "help" => $help, "open" => $open, "display" => $display);
 
     while (True) {
         global $commands;
