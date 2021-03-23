@@ -88,33 +88,64 @@
             } elseif (count($args) == 0) {
                 //Display the currently loaded csv file
                 $this->standardDisplay();
-            } 
+            } elseif (count($args) == 1) {
+                if (substr_count($args[0], "=") == 1) {
+                    $this->displayWithEq($args[0]);
+                }
+            }
         }
 
         public function help() {
             echo "\e[32m display - displays all information in the currently loaded file\n";
+            echo " display [header]=[value] - displays all rows in the loaded file that have the given header value. Note that for values or headers" . 
+                    " with spaces you will need to wrap the entire argument in quotes. (i.e \e[39mdisplay \"a=Hello World\"\e[32m)\n";
             echo "See also the \"list\" command for alternative ways to display information\n";
             echo"\e[39m";
         } 
 
         public function argsAreValid($args) {
+            if (count($args) == 1) {
+                return substr_count($args[0], "=") == 1;
+            }
             return count($args) == 0;
+        }
+
+        function displayWithEq($modifier) {
+            global $fileData, $fileHeaders;
+            $header = explode('=', $modifier)[0];
+            $value = explode('=', $modifier)[1];
+            $index = array_search($header, $fileHeaders);
+
+            if ($index === false)
+                echo "\e[31m error: Header $header not found\n\e[39m";
+            else {
+                foreach ($fileData as &$dataline) {
+                    if (strcmp($dataline[$index], $value) == 0)
+                        $this->displayDataLine($dataline);
+                }
+                echo "\e[39m";
+            }
         }
 
         function standardDisplay() {
             global $fileData, $fileHeaders;
             foreach ($fileData as &$dataline) {
-                if (is_array($dataline)) {
-                    $i = 0;
-                    foreach ($fileHeaders as &$header) {
-                        echo "\e[96m"; //Change color to light cyan
-                        printf("%s: \e[37m%s", $header, $dataline[$i++]);
-                        echo "\n";
-                    }
-                    echo "\n";
-                }
+                $this->displayDataLine($dataline);
             }
             echo "\e[39m";
+        }
+
+        function displayDataLine($dataline) {
+            global $fileHeaders;
+            if (is_array($dataline)) {
+                $i = 0;
+                foreach ($fileHeaders as &$header) {
+                    echo "\e[96m"; //Change color to light cyan
+                    printf("%s: \e[37m%s", $header, $dataline[$i++]);
+                    echo "\n";
+                }
+                echo "\n";
+            }
         }
     };
 
@@ -156,7 +187,23 @@
         $input = rtrim(fgets(STDIN));
         $command = explode(' ', $input)[0];
         if (in_array($command, array_keys($commands))) {
-            $args = array_slice(explode(' ', $input), 1);
+            //Build argument list with quotes allowed (ignore spaces when under quotes)
+            $args = array();
+            $insidequotes = false;
+            $init_args = array_slice(explode(' ', $input), 1);
+            foreach ($init_args as &$word) {
+                if (strpos($word, '"') === 0) {
+                    $insidequotes = true;
+                    array_push($args, substr($word, 1) . ' ');
+                } elseif (strpos($word, '"') === strlen($word) - 1) {
+                    $insidequotes = false;
+                    $args[count($args) - 1] .= substr($word, 0, -1);
+                } elseif ($insidequotes)
+                    $args[count($args) - 1] .= $word . ' ';
+                else
+                    array_push($args, $word);
+            }
+
             if ($commands[$command]->argsAreValid($args))
                 $commands[$command]->execute($args);
             else {
