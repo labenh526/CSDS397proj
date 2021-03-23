@@ -35,7 +35,9 @@
                 echo "  display - displays the currently loaded file (see \"help display\" for details)\n";
                 echo "  exit - exits the program\n";
                 echo "  help - lists all commands \n";
+                echo "  list - lists all entries under a given header \n";
                 echo "  open - loads a csv file\n";
+                echo "Type \"help [command]\" for more detailed information on a specific command\n";
                 echo "\e[39m\n"; //back to default color
             } else {
                 $commands[$args[0]]->help();
@@ -90,8 +92,9 @@
         }
 
         public function help() {
-            echo "\e[32m display - displays all information in the currently loaded file";
-            echo"\n\e[39m";
+            echo "\e[32m display - displays all information in the currently loaded file\n";
+            echo "See also the \"list\" command for alternative ways to display information\n";
+            echo"\e[39m";
         } 
 
         public function argsAreValid($args) {
@@ -115,7 +118,36 @@
         }
     };
 
-    $commands = array("exit" => $exit, "help" => $help, "open" => $open, "display" => $display);
+    $list = new class implements Command {
+        public function execute($args) {
+            global $fileHeaders, $fileData;
+            if (is_null($fileHeaders) || is_null($fileData)) {
+                echo "\e[31m error: no file loaded into program. Use \"open\" to load a file.\n\e[39m";
+            } elseif(strcmp($args[0],"-headers") == 0) {
+                echo "Headers: \e[96m" . implode(", ", $fileHeaders) . "\e[39m\n";
+            } elseif (in_array($args[0], $fileHeaders)) {
+                $index = array_search($args[0], $fileHeaders);
+                printf("\e[90mAll data under header \e[96m%s\e[39m:\n", $args[0]);
+                foreach ($fileData as &$dataline) {
+                    if (is_array($dataline)) {
+                        print $dataline[$index] . "\n";
+                    }
+                }
+            } else {
+                printf("\e[31m error: %s not found in headers. Use \"list -headers\" to show all available headers\n\e[39m", $args[0]);
+            }
+        }
+
+        public function help() {
+            echo "\e[32m\nlist [header] - displays all information under a given header in the loaded file\nlist -headers - displays all headers in the loaded file\nSee also \"display\" for displaying functionality \e[39m\n";
+        } 
+
+        public function argsAreValid($args) {
+            return count($args) == 1;
+        }
+    };
+
+    $commands = array("exit" => $exit, "help" => $help, "open" => $open, "display" => $display, "list" => $list);
 
     while (True) {
         global $commands;
