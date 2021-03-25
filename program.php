@@ -89,10 +89,11 @@
                 //Display the currently loaded csv file
                 $this->standardDisplay();
             } elseif (count($args) == 1) {
-                if (substr_count($args[0], "=") == 1) {
-                    $this->displayWithEq($args[0]);
-                } elseif (substr_count($args[0], "<") == 1) {
+                if (substr_count($args[0], "<") == 1 || substr_count($args[0], ">") == 1
+                || substr_count($args[0], ">=") == 1 || substr_count($args[0], "<=") == 1) {
                     $this->displayWithComparison($args[0]);
+                } elseif (substr_count($args[0], "=") == 1) {
+                    $this->displayWithEq($args[0]);
                 }
             }
         }
@@ -101,13 +102,17 @@
             echo "\e[32m display - displays all information in the currently loaded file\n";
             echo " display [header]=[value] - displays all rows in the loaded file that have the given header value. Note that for values or headers" . 
                     " with spaces you will need to wrap the entire argument in quotes. (i.e \e[39mdisplay \"a=Hello World\"\e[32m)\n";
+            echo " display [header][comparison operator][value] - displays all rows in the loaded file where the comparison given " .
+                "evaluates to true. Supports the following comparison operators: <,>,<=,>=\n";
             echo "See also the \"list\" command for alternative ways to display information\n";
             echo"\e[39m";
         } 
 
         public function argsAreValid($args) {
             if (count($args) == 1) {
-                return substr_count($args[0], "=") == 1 || substr_count($args[0], "<") == 1;
+                return (substr_count($args[0], "=") == 1 && substr_count($args[0], ">=") == 0 && substr_count($args[0], "<=") == 0) 
+                || substr_count($args[0], "<") == 1 || substr_count($args[0], ">") == 1
+                || substr_count($args[0], ">=") == 1 || substr_count($args[0], "<=") == 1;
             }
             return count($args) == 0;
         }
@@ -131,16 +136,19 @@
 
         function displayWithComparison($modifier) {
             global $fileData, $fileHeaders;
-            $header = explode('<', $modifier)[0];
-            $value = explode('<', $modifier)[1];
+            $header = preg_split("/(<|>)(?!=)|<=|>=/", $modifier)[0];
+            $value = preg_split("/(<|>)(?!=)|<=|>=/", $modifier)[1];
             $index = array_search($header, $fileHeaders);
+            $matches = Array();
+            preg_match("/(<|>)(?!=)|<=|>=/", $modifier, $matches);
+            $comparison = $this->stringToComparisonFunc($matches[0]);
 
             if ($index === false)
                 echo "\e[31m error: Header $header not found\n\e[39m";
             else {
                 foreach ($fileData as &$dataline) {
                     if (is_numeric($dataline[$index])) {
-                        if (intval($dataline[$index]) < $value) {
+                        if (intval($comparison($dataline[$index], $value))) {
                             $this->displayDataLine($dataline);
                         }
                     } elseif (is_array($dataline)) {
@@ -148,6 +156,18 @@
                     }
                 }
             }
+        }
+
+        function stringToComparisonFunc($str) {
+            if (strcmp(">", $str) === 0)
+                return function($a, $b) {return $a > $b;};
+            if (strcmp("<", $str) === 0)
+                return function($a, $b) {return $a < $b;};
+            if (strcmp(">=", $str) === 0)
+                return function($a, $b) {return $a >= $b;};
+            if (strcmp("<=", $str) === 0)
+                return function($a, $b) {return $a <= $b;};
+            throw new ErrorException("Invalid string of comparison operator");
         }
 
         function standardDisplay() {
