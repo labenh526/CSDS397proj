@@ -91,6 +91,8 @@
             } elseif (count($args) == 1) {
                 if (substr_count($args[0], "=") == 1) {
                     $this->displayWithEq($args[0]);
+                } elseif (substr_count($args[0], "<") == 1) {
+                    $this->displayWithComparison($args[0]);
                 }
             }
         }
@@ -105,7 +107,7 @@
 
         public function argsAreValid($args) {
             if (count($args) == 1) {
-                return substr_count($args[0], "=") == 1;
+                return substr_count($args[0], "=") == 1 || substr_count($args[0], "<") == 1;
             }
             return count($args) == 0;
         }
@@ -124,6 +126,29 @@
                         $this->displayDataLine($dataline);
                 }
                 echo "\e[39m";
+            }
+        }
+
+        function displayWithComparison($modifier) {
+            global $fileData, $fileHeaders;
+            $header = explode('<', $modifier)[0];
+            $value = explode('<', $modifier)[1];
+            $index = array_search($header, $fileHeaders);
+
+            if ($index === false)
+                echo "\e[31m error: Header $header not found\n\e[39m";
+            else {
+                foreach ($fileData as &$dataline) {
+                    if (is_numeric($dataline[$index])) {
+                        if (intval($dataline[$index]) < $value) {
+                            $this->displayDataLine($dataline);
+                        }
+                    } elseif (is_array($dataline)) {
+                        echo "\e[31m error: Non numeric value\n\e[39m";
+                        echo intval($dataline[$index]) . '  ';
+                        echo $dataline[$index] . "\n";
+                    }
+                }
             }
         }
 
