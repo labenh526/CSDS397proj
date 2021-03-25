@@ -144,9 +144,7 @@
                             $this->displayDataLine($dataline);
                         }
                     } elseif (is_array($dataline)) {
-                        echo "\e[31m error: Non numeric value\n\e[39m";
-                        echo intval($dataline[$index]) . '  ';
-                        echo $dataline[$index] . "\n";
+                        printf("\e[31m error: Non numeric value: %s\n\e[39m", $dataline[$index]);
                     }
                 }
             }
